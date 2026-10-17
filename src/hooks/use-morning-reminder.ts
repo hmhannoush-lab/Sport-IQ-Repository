@@ -5,6 +5,7 @@ import {
   sendBadgeNotification,
   notificationsEnabled,
 } from "@/lib/pushNotifications";
+import { reminderMessage } from "@/lib/motivation";
 
 const FIRED_KEY = "vital.morningReminder.lastFiredDate";
 
@@ -20,6 +21,7 @@ export function useMorningReminder() {
   const { store } = useStore();
   const reminderTime = store.preferences?.reminderTime ?? "08:00";
   const enabled = store.preferences?.notifications ?? false;
+  const style = store.preferences?.motivationStyle;
 
   useEffect(() => {
     if (!enabled) return;
@@ -44,7 +46,7 @@ export function useMorningReminder() {
         if (!loggedToday && notificationsEnabled()) {
           sendBadgeNotification(
             "Good morning ☀️",
-            "Take 30 seconds to log how you slept and how you're feeling today.",
+            reminderMessage(style),
           );
         }
         try { localStorage.setItem(FIRED_KEY, today); } catch { /* ignore */ }
@@ -59,5 +61,5 @@ export function useMorningReminder() {
     return () => {
       if (timer) clearTimeout(timer);
     };
-  }, [enabled, reminderTime, store.metrics, store.fatigue]);
+  }, [enabled, reminderTime, style, store.metrics, store.fatigue]);
 }

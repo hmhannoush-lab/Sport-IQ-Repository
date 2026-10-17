@@ -1,4 +1,5 @@
 import { useStore } from "@/lib/store";
+import { useUnits } from "@/lib/units";
 import { personalAdvice, AdviceLevel } from "@/lib/advice";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ interface Props {
 
 export const PersonalAdvice = ({ compact = false }: Props) => {
   const { store } = useStore();
+  const { water } = useUnits();
   const profile = store.profile;
   if (!profile) return null;
 
@@ -162,7 +164,7 @@ export const PersonalAdvice = ({ compact = false }: Props) => {
         </div>
         <p className="text-sm text-foreground/90 italic mb-4">{advice.diet.why}</p>
         <div className="grid grid-cols-3 gap-3 mb-5">
-          <StatTile icon={Droplets} label="Hydration" value={`${(advice.diet.hydrationMl / 1000).toFixed(1)} L`} />
+          <StatTile icon={Droplets} label="Hydration" value={water(advice.diet.hydrationMl)} />
           <StatTile label="Protein" value={`${advice.diet.proteinG} g`} />
           <StatTile label="Calories" value={advice.diet.calorieDelta === 0 ? "On target" : `${advice.diet.calorieDelta > 0 ? "+" : ""}${advice.diet.calorieDelta} kcal`} />
         </div>

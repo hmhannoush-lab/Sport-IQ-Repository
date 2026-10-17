@@ -57,6 +57,25 @@ export interface Workout {
   durationMin: number;
   intensity: "low" | "medium" | "high";
   notes?: string;
+  /** Strength sets logged during the session, in the order performed. */
+  sets?: WorkoutSet[];
+}
+
+export interface WorkoutSet {
+  exercise: string;
+  reps: number;
+  /** Load in kg; omitted for bodyweight sets. */
+  weightKg?: number;
+}
+
+/** A saved session the user can re-log in one tap. */
+export interface WorkoutTemplate {
+  id: string;
+  name: string;
+  type: string;
+  durationMin: number;
+  intensity: Workout["intensity"];
+  sets?: WorkoutSet[];
 }
 
 export interface FatigueEntry {
@@ -124,6 +143,20 @@ export interface Tournament {
   sport?: string;
 }
 
+export type RecordUnit = "kg" | "reps" | "km" | "min" | "s";
+
+export interface PersonalRecord {
+  id: string;
+  exercise: string;
+  value: number;
+  unit: RecordUnit;
+  /** ISO date YYYY-MM-DD. */
+  date: string;
+}
+
+/** Time-based records improve when the number goes down. */
+export const lowerIsBetter = (unit: RecordUnit) => unit === "min" || unit === "s";
+
 interface Store {
   profile: Profile | null;
   metrics: Record<string, DailyMetrics>;
@@ -137,10 +170,15 @@ interface Store {
   alertRules: import("./alerts").AlertRule[];
   alertHistory: import("./alerts").AlertEvent[];
   tournament: Tournament | null;
-
+  records: PersonalRecord[];
+  templates: WorkoutTemplate[];
 }
 
 const KEY = "vital-store-v1";
+
+export const defaultPreferences: Preferences = {
+  units: "metric", reminderTime: "08:00", motivationStyle: "balanced", notifications: true,
+};
 
 const defaultStore: Store = {
   profile: null,
@@ -155,8 +193,20 @@ const defaultStore: Store = {
   alertRules: [],
   alertHistory: [],
   tournament: null,
-
+  records: [],
+  templates: [],
 };
+
+const ARRAY_KEYS = ["workouts", "fatigue", "sports", "friends", "alertRules", "alertHistory", "records", "templates"] as const;
+
+/** Checks that a parsed backup file has the shape of a store before restoring it. */
+function isStoreBackup(data: unknown): data is Partial<Store> {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return false;
+  const d = data as Record<string, unknown>;
+  if (d.profile !== null && (typeof d.profile !== "object" || typeof (d.profile as Profile)?.name !== "string")) return false;
+  if (d.metrics !== undefined && (typeof d.metrics !== "object" || d.metrics === null)) return false;
+  return ARRAY_KEYS.every((k) => d[k] === undefined || Array.isArray(d[k]));
+}
 
 
 function read(): Store {
@@ -170,7 +220,7 @@ function read(): Store {
   }
 }
 
-function write(s: Store) {
+function write(s: Store): boolean {
   try {
     localStorage.setItem(KEY, JSON.stringify(s));
   } catch {
@@ -179,9 +229,10 @@ function write(s: Store) {
     toast.error("Couldn't save your changes", {
       description: "Your device storage for this app is full. Try a smaller profile photo or remove it in the avatar editor.",
     });
-    return;
+    return false;
   }
   window.dispatchEvent(new Event("vital-store-update"));
+  return true;
 }
 
 export function useStore() {
@@ -236,6 +287,11 @@ export function useStore() {
     },
     setHealthBaseline: (h: HealthBaseline) => write({ ...read(), healthBaseline: h }),
     setPreferences: (p: Preferences) => write({ ...read(), preferences: p }),
+    /** Changes individual preferences, filling defaults if onboarding never saved any. */
+    updatePreferences: (patch: Partial<Preferences>) => {
+      const s = read();
+      write({ ...s, preferences: { ...defaultPreferences, ...s.preferences, ...patch } });
+    },
     completeOnboarding: (data: {
       profile: Profile;
       sports: SportPractice[];
@@ -293,6 +349,36 @@ export function useStore() {
     },
     clearAlertHistory: () => write({ ...read(), alertHistory: [] }),
     setTournament: (t: Tournament | null) => write({ ...read(), tournament: t }),
+    addRecord: (r: Omit<PersonalRecord, "id">) => {
+      const s = read();
+      write({ ...s, records: [{ ...r, id: crypto.randomUUID() }, ...s.records].slice(0, 300) });
+    },
+    deleteRecord: (id: string) => {
+      const s = read();
+      write({ ...s, records: s.records.filter((r) => r.id !== id) });
+    },
+    addTemplate: (t: Omit<WorkoutTemplate, "id">) => {
+      const s = read();
+      // Saving under an existing name replaces that template.
+      const others = s.templates.filter((x) => x.name.toLowerCase() !== t.name.toLowerCase());
+      write({ ...s, templates: [{ ...t, id: crypto.randomUUID() }, ...others].slice(0, 30) });
+    },
+    deleteTemplate: (id: string) => {
+      const s = read();
+      write({ ...s, templates: s.templates.filter((t) => t.id !== id) });
+    },
+    exportData: () => JSON.stringify({ app: "sport-iq", version: 1, exportedAt: new Date().toISOString(), data: read() }, null, 2),
+    /** Restores a backup made by exportData. Returns false if the file isn't a valid backup. */
+    importData: (json: string): boolean => {
+      try {
+        const parsed = JSON.parse(json);
+        const data = parsed?.app === "sport-iq" ? parsed.data : parsed;
+        if (!isStoreBackup(data)) return false;
+        return write({ ...defaultStore, ...data });
+      } catch {
+        return false;
+      }
+    },
 
     reset: () => write(defaultStore),
 

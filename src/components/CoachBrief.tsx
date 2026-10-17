@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useStore, todayKey } from "@/lib/store";
+import { useUnits } from "@/lib/units";
 import { hydrationTargetMl } from "@/lib/health";
 import { buildSeries, seriesStats } from "@/lib/stats";
 import { Card } from "@/components/ui/card";
@@ -31,6 +32,7 @@ const priorityLabel: Record<Priority, string> = {
 
 export const CoachBrief = () => {
   const { store } = useStore();
+  const { units, water: fmtWater } = useUnits();
   const profile = store.profile;
 
   const focuses = useMemo<Focus[]>(() => {
@@ -81,7 +83,7 @@ export const CoachBrief = () => {
         id: "water",
         icon: Droplets,
         title: "Hydration is behind",
-        message: `You're at ${(todayWater / 1000).toFixed(1)}L of a ${(hydroTarget / 1000).toFixed(1)}L target. A glass now and one with each meal usually closes the gap without thinking about it.`,
+        message: `You're at ${fmtWater(todayWater)} of a ${fmtWater(hydroTarget)} target. A glass now and one with each meal usually closes the gap without thinking about it.`,
         priority: todayWater === 0 ? "high" : "medium",
       });
     }
@@ -146,7 +148,8 @@ export const CoachBrief = () => {
     return out
       .sort((a, b) => order.indexOf(a.priority) - order.indexOf(b.priority))
       .slice(0, 3);
-  }, [store, profile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fmtWater is rebuilt from `units` each render
+  }, [store, profile, units]);
 
   if (!profile) return null;
 

@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { Profile, SportPractice, HealthBaseline, Preferences, useStore } from "@/lib/store";
+import { Profile, SportPractice, HealthBaseline, Preferences, useStore, defaultPreferences } from "@/lib/store";
+import { compressImage } from "@/lib/image";
+import { cmToFtIn, ftInToCm, displayWater, displayWeight, kgFrom, mlFrom } from "@/lib/units";
 import { ALLERGENS } from "@/lib/allergies";
 import { SPORTS } from "@/lib/sports";
 import { AVATAR_OPTIONS } from "@/lib/badges";
@@ -39,9 +41,10 @@ export const Onboarding = ({ onClose }: { onClose?: () => void } = {}) => {
     avgSleepHours: 7, restingHr: 65, injuries: "", fatigueLevel: 4, stressLevel: 4,
     dailyWaterMl: 2000, currentPain: "", moldExposure: "none", medicalConditions: "", allergies: [], allergyNotes: "",
   });
-  const [prefs, setPrefs] = useState<Preferences>(store.preferences ?? {
-    units: "metric", reminderTime: "08:00", motivationStyle: "balanced", notifications: true,
-  });
+  const [prefs, setPrefs] = useState<Preferences>(store.preferences ?? defaultPreferences);
+  const units = prefs.units;
+  const imperial = units === "imperial";
+  const { ft, inch } = cmToFtIn(profile.heightCm);
 
   const step = STEPS[stepIdx];
   const progress = ((stepIdx + 1) / STEPS.length) * 100;
@@ -147,15 +150,10 @@ export const Onboarding = ({ onClose }: { onClose?: () => void } = {}) => {
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (!file) return;
-                          if (file.size > 3 * 1024 * 1024) {
-                            alert("Please choose an image under 3 MB.");
-                            return;
-                          }
-                          const reader = new FileReader();
-                          reader.onload = () => {
-                            setProfile({ ...profile, avatarImage: String(reader.result) });
-                          };
-                          reader.readAsDataURL(file);
+                          // Shrunk to a small JPEG so even large phone photos fit in local storage.
+                          compressImage(file)
+                            .then((avatarImage) => setProfile((p) => ({ ...p, avatarImage })))
+                            .catch(() => alert("Couldn't read that image. Try a JPG or PNG."));
                         }}
                       />
                     </label>
@@ -220,14 +218,34 @@ export const Onboarding = ({ onClose }: { onClose?: () => void } = {}) => {
                   </Select>
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label>Units</Label>
+                <Select value={prefs.units} onValueChange={(v) => setPrefs({ ...prefs, units: v as Preferences["units"] })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="metric">Metric (kg, cm, L)</SelectItem>
+                    <SelectItem value="imperial">Imperial (lb, ft/in, fl oz)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid grid-cols-2 gap-4">
+                {imperial ? (
+                  <div className="space-y-2">
+                    <Label>Height (ft / in)</Label>
+                    <div className="flex gap-2">
+                      <Input type="number" min={3} max={7} aria-label="Feet" value={ft} onChange={(e) => setProfile({ ...profile, heightCm: ftInToCm(+e.target.value, inch) })} />
+                      <Input type="number" min={0} max={11} aria-label="Inches" value={inch} onChange={(e) => setProfile({ ...profile, heightCm: ftInToCm(ft, +e.target.value) })} />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Height (cm)</Label>
+                    <Input type="number" min={100} max={230} value={Math.round(profile.heightCm)} onChange={(e) => setProfile({ ...profile, heightCm: +e.target.value })} />
+                  </div>
+                )}
                 <div className="space-y-2">
-                  <Label>Height (cm)</Label>
-                  <Input type="number" min={100} max={230} value={profile.heightCm} onChange={(e) => setProfile({ ...profile, heightCm: +e.target.value })} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Weight (kg)</Label>
-                  <Input type="number" min={30} max={250} value={profile.weightKg} onChange={(e) => setProfile({ ...profile, weightKg: +e.target.value })} />
+                  <Label>Weight ({imperial ? "lb" : "kg"})</Label>
+                  <Input type="number" min={imperial ? 66 : 30} max={imperial ? 550 : 250} value={displayWeight(profile.weightKg, units)} onChange={(e) => setProfile({ ...profile, weightKg: kgFrom(+e.target.value, units) })} />
                 </div>
               </div>
               <div className="space-y-2">
@@ -291,12 +309,12 @@ export const Onboarding = ({ onClose }: { onClose?: () => void } = {}) => {
               {(profile.goal === "lose" || profile.goal === "gain") && (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Target weight (kg)</Label>
+                    <Label>Target weight ({imperial ? "lb" : "kg"})</Label>
                     <Input
-                      type="number" min={30} max={250} step={0.5}
-                      value={profile.targetWeightKg ?? ""}
-                      placeholder={profile.goal === "lose" ? "e.g. 62" : "e.g. 75"}
-                      onChange={(e) => setProfile({ ...profile, targetWeightKg: e.target.value ? +e.target.value : undefined })}
+                      type="number" min={imperial ? 66 : 30} max={imperial ? 550 : 250} step={0.5}
+                      value={profile.targetWeightKg ? displayWeight(profile.targetWeightKg, units) : ""}
+                      placeholder={profile.goal === "lose" ? (imperial ? "e.g. 137" : "e.g. 62") : (imperial ? "e.g. 165" : "e.g. 75")}
+                      onChange={(e) => setProfile({ ...profile, targetWeightKg: e.target.value ? kgFrom(+e.target.value, units) : undefined })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -462,14 +480,14 @@ export const Onboarding = ({ onClose }: { onClose?: () => void } = {}) => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Daily water intake (L)</Label>
+                  <Label>Daily water intake ({imperial ? "fl oz" : "L"})</Label>
                   <Input
                     type="number"
                     min={0}
-                    max={6}
-                    step={0.1}
-                    value={health.dailyWaterMl ? +(health.dailyWaterMl / 1000).toFixed(2) : 0}
-                    onChange={(e) => setHealth({ ...health, dailyWaterMl: Math.round((+e.target.value || 0) * 1000) })}
+                    max={imperial ? 200 : 6}
+                    step={imperial ? 1 : 0.1}
+                    value={health.dailyWaterMl ? displayWater(health.dailyWaterMl, units) : 0}
+                    onChange={(e) => setHealth({ ...health, dailyWaterMl: Math.round(mlFrom(+e.target.value || 0, units)) })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -557,21 +575,9 @@ export const Onboarding = ({ onClose }: { onClose?: () => void } = {}) => {
 
           {step.id === "prefs" && (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Units</Label>
-                  <Select value={prefs.units} onValueChange={(v) => setPrefs({ ...prefs, units: v as Preferences["units"] })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="metric">Metric (kg, cm)</SelectItem>
-                      <SelectItem value="imperial">Imperial (lb, in)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Daily reminder</Label>
-                  <Input type="time" value={prefs.reminderTime} onChange={(e) => setPrefs({ ...prefs, reminderTime: e.target.value })} />
-                </div>
+              <div className="space-y-2">
+                <Label>Daily reminder</Label>
+                <Input type="time" value={prefs.reminderTime} onChange={(e) => setPrefs({ ...prefs, reminderTime: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Motivation style</Label>

@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useStore, todayKey, type DailyMetrics } from "@/lib/store";
+import { useUnits, displayWater, displayWeight, kgFrom, type Units } from "@/lib/units";
 import { Plus, Check, History, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { MetricHistoryCharts } from "./MetricHistoryCharts";
@@ -19,22 +20,28 @@ const FIELDS: {
   { key: "steps", label: "Steps", placeholder: "8200" },
   { key: "activeMinutes", label: "Active min", placeholder: "45" },
   { key: "restingHr", label: "Resting HR", placeholder: "58" },
-  { key: "weightKg", label: "Weight (kg)", placeholder: "72.4", step: "0.1" },
+  { key: "weightKg", label: "Weight", placeholder: "72.4", step: "0.1" },
   { key: "calories", label: "Calories", placeholder: "2100" },
   { key: "proteinG", label: "Protein (g)", placeholder: "120" },
   { key: "fatigueLevel", label: "Fatigue 1–10", placeholder: "4" },
   { key: "soreness", label: "Soreness 1–10", placeholder: "3" },
 ];
 
+/** Weight is stored in kg but shown and typed in the user's units. */
+const toShown = (key: string, v: number, u: Units) => (key === "weightKg" ? displayWeight(v, u) : v);
+const labelFor = (f: (typeof FIELDS)[number], u: Units) =>
+  f.key === "weightKg" ? `Weight (${u === "imperial" ? "lb" : "kg"})` : f.label;
+
 export const LogToday = () => {
   const { store, upsertMetrics } = useStore();
   const { toast } = useToast();
+  const { units, labels } = useUnits();
   const today = store.metrics[todayKey()];
 
   const initial: Record<string, string> = {};
   FIELDS.forEach((f) => {
     const v = today?.[f.key as keyof typeof today] as number | undefined;
-    initial[f.key] = v ? String(v) : "";
+    initial[f.key] = v ? String(toShown(f.key, v, units)) : "";
   });
   const [values, setValues] = useState(initial);
 
@@ -48,7 +55,7 @@ export const LogToday = () => {
       if (raw && raw.trim() !== "") {
         const n = parseFloat(raw);
         if (!Number.isNaN(n)) {
-          patch[f.key] = n;
+          patch[f.key] = f.key === "weightKg" ? kgFrom(n, units) : n;
           count++;
         }
       }
@@ -66,7 +73,7 @@ export const LogToday = () => {
 
   const recorded = FIELDS.map((f) => {
     const v = today?.[f.key as keyof typeof today] as number | undefined;
-    return isLogged(v) ? { label: f.label, value: v } : null;
+    return isLogged(v) ? { label: labelFor(f, units), value: toShown(f.key, v, units) } : null;
   }).filter((x): x is { label: string; value: number } => x !== null);
 
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -78,16 +85,16 @@ export const LogToday = () => {
       .map((m) => {
         const entries = FIELDS.map((f) => {
           const v = m[f.key as keyof DailyMetrics] as number | undefined;
-          return isLogged(v) ? { label: f.label, value: v } : null;
+          return isLogged(v) ? { label: labelFor(f, units), value: toShown(f.key, v, units) } : null;
         }).filter((x): x is { label: string; value: number } => x !== null);
-        // Include water as it's tracked separately — shown in liters.
-        const water = m.waterMl && m.waterMl > 0 ? { label: "Water (L)", value: +(m.waterMl / 1000).toFixed(2) } : null;
+        // Include water as it's tracked separately.
+        const water = m.waterMl && m.waterMl > 0 ? { label: `Water (${labels.water})`, value: displayWater(m.waterMl, units) } : null;
         if (water) entries.push(water);
         return { date: m.date, entries };
       })
       .filter((d) => d.entries.length > 0)
       .sort((a, b) => (a.date < b.date ? 1 : -1));
-  }, [store.metrics]);
+  }, [store.metrics, units, labels.water]);
 
   return (
     <Card className="p-5 sm:p-6 border-border/50 shadow-card rounded-3xl bg-card/80 backdrop-blur-sm">
@@ -122,7 +129,7 @@ export const LogToday = () => {
         {FIELDS.map((f) => (
           <div key={f.key} className="space-y-1.5">
             <Label htmlFor={`log-${f.key}`} className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-              {f.label}
+              {labelFor(f, units)}
             </Label>
             <Input
               id={`log-${f.key}`}

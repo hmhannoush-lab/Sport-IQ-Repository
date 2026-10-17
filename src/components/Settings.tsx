@@ -1,11 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useStore, todayKey } from "@/lib/store";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Settings as SettingsIcon, Check, RotateCcw, Palette, Type, Languages, Moon } from "lucide-react";
+import { Settings as SettingsIcon, Check, RotateCcw, Palette, Type, Languages, Moon, DatabaseBackup, Download, Upload, Ruler, FileSpreadsheet, Smartphone } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { defaultPreferences, type Preferences } from "@/lib/store";
+import { downloadText, metricsCsv, workoutsCsv } from "@/lib/exportFiles";
+import { useInstallPrompt } from "@/lib/pwa";
 import { getQuietHours, setQuietHours, isQuietNow } from "@/lib/quietHours";
 import { useTheme } from "@/hooks/use-theme";
 import { useFontPrefs } from "@/hooks/use-font-prefs";
@@ -20,6 +26,34 @@ export const Settings = () => {
   const { code, languages, setLanguage } = useLanguage();
   const [quiet, setQuiet] = useState(getQuietHours);
   const updateQuiet = (patch: Parameters<typeof setQuietHours>[0]) => setQuiet(setQuietHours(patch));
+  const { store, exportData, importData, updatePreferences } = useStore();
+  const prefsNow = store.preferences ?? defaultPreferences;
+  const fileRef = useRef<HTMLInputElement>(null);
+  const { canInstall, install, installed } = useInstallPrompt();
+
+  const downloadBackup = () => {
+    downloadText(`sport-iq-backup-${todayKey()}.json`, exportData(), "application/json");
+    toast.success(t("Backup downloaded"));
+  };
+
+  const downloadCsv = (kind: "metrics" | "workouts") => {
+    const empty = kind === "metrics" ? Object.keys(store.metrics).length === 0 : store.workouts.length === 0;
+    if (empty) {
+      toast.error(t("Nothing to export yet."));
+      return;
+    }
+    const csv = kind === "metrics" ? metricsCsv(store.metrics) : workoutsCsv(store.workouts);
+    downloadText(`sport-iq-${kind}-${todayKey()}.csv`, csv, "text/csv");
+  };
+
+  const restoreBackup = async (file: File | undefined) => {
+    if (fileRef.current) fileRef.current.value = "";
+    if (!file) return;
+    if (!confirm(t("Restoring replaces all current data on this device. Continue?"))) return;
+    const ok = importData(await file.text());
+    if (ok) toast.success(t("Backup restored"));
+    else toast.error(t("That file isn't a valid Sport IQ backup."));
+  };
 
 
   useEffect(() => {
@@ -281,6 +315,111 @@ export const Settings = () => {
                   />
                 </div>
               </div>
+            </div>
+          </section>
+
+          {/* Units & coaching tone */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Ruler className="h-4 w-4 text-muted-foreground" />
+              <h3 className="font-display text-sm uppercase tracking-[0.2em] text-muted-foreground">
+                {t("Units & coaching")}
+              </h3>
+            </div>
+            <div className="rounded-xl border border-border/60 p-3 space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-sm">{t("Units")}</Label>
+                <Select value={prefsNow.units} onValueChange={(v) => updatePreferences({ units: v as Preferences["units"] })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="metric">{t("Metric (kg, cm, L)")}</SelectItem>
+                    <SelectItem value="imperial">{t("Imperial (lb, ft/in, fl oz)")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">{t("Motivation style")}</Label>
+                <Select value={prefsNow.motivationStyle} onValueChange={(v) => updatePreferences({ motivationStyle: v as Preferences["motivationStyle"] })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="gentle">{t("Gentle — kind & supportive")}</SelectItem>
+                    <SelectItem value="balanced">{t("Balanced — encouraging with clear goals")}</SelectItem>
+                    <SelectItem value="intense">{t("Intense — push me, hold me accountable")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">{t("Changes your streak messages, reminders and the AI coach's tone.")}</p>
+              </div>
+            </div>
+          </section>
+
+          {/* Backup & restore */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <DatabaseBackup className="h-4 w-4 text-muted-foreground" />
+              <h3 className="font-display text-sm uppercase tracking-[0.2em] text-muted-foreground">
+                {t("Backup & restore")}
+              </h3>
+            </div>
+            <div className="rounded-xl border border-border/60 p-3 space-y-3">
+              <p className="text-xs text-muted-foreground">
+                {t("Your data lives only in this browser. Download a backup to keep it safe or move it to another device.")}
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="flex-1 rounded-full" onClick={downloadBackup}>
+                  <Download className="h-3.5 w-3.5 mr-1.5" /> {t("Download")}
+                </Button>
+                <Button variant="outline" size="sm" className="flex-1 rounded-full" onClick={() => fileRef.current?.click()}>
+                  <Upload className="h-3.5 w-3.5 mr-1.5" /> {t("Restore")}
+                </Button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={(e) => restoreBackup(e.target.files?.[0])}
+                />
+              </div>
+              <div className="pt-3 border-t border-border/40 space-y-2">
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <FileSpreadsheet className="h-3.5 w-3.5" /> {t("Spreadsheet export (CSV, metric units)")}
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1 rounded-full" onClick={() => downloadCsv("metrics")}>
+                    {t("Daily metrics")}
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex-1 rounded-full" onClick={() => downloadCsv("workouts")}>
+                    {t("Workouts")}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Install as an app */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <Smartphone className="h-4 w-4 text-muted-foreground" />
+              <h3 className="font-display text-sm uppercase tracking-[0.2em] text-muted-foreground">
+                {t("Install app")}
+              </h3>
+            </div>
+            <div className="rounded-xl border border-border/60 p-3 space-y-3">
+              {installed ? (
+                <p className="text-xs text-muted-foreground">{t("Sport IQ is installed on this device.")}</p>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    {canInstall
+                      ? t("Add Sport IQ to your home screen. It opens like an app and works offline.")
+                      : t("To install, open your browser menu and choose \"Add to Home Screen\" or \"Install app\". On iPhone, use Safari's Share button.")}
+                  </p>
+                  {canInstall && (
+                    <Button variant="outline" size="sm" className="w-full rounded-full" onClick={install}>
+                      <Download className="h-3.5 w-3.5 mr-1.5" /> {t("Install Sport IQ")}
+                    </Button>
+                  )}
+                </>
+              )}
             </div>
           </section>
         </div>

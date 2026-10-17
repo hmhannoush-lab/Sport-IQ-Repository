@@ -1,4 +1,6 @@
-import { DailyMetrics, Workout, localDateKey } from "./store";
+import { DailyMetrics, Preferences, Workout, localDateKey } from "./store";
+
+export type MotivationStyle = Preferences["motivationStyle"];
 
 export const QUOTES: { text: string; author: string; funFact: string; source: string }[] = [
   {
@@ -163,11 +165,49 @@ export function weeklyActiveDays(metrics: Record<string, DailyMetrics>, workouts
   return count;
 }
 
-export function streakMessage(streak: number) {
-  if (streak === 0) return "Today is a great day to begin.";
-  if (streak === 1) return "You've started — keep the momentum.";
-  if (streak < 4) return "Building a rhythm. Stay with it.";
-  if (streak < 8) return "You're in a groove. Beautiful.";
-  if (streak < 21) return "Real consistency. Your body is noticing.";
-  return "Extraordinary discipline. You're an inspiration.";
+/** Streak copy for each tier (0, 1, 2–3, 4–7, 8–20, 21+ days), in the user's chosen tone. */
+const STREAK_COPY: Record<MotivationStyle, string[]> = {
+  gentle: [
+    "Whenever you're ready — one small step is plenty.",
+    "A lovely start. Be proud of showing up.",
+    "A gentle rhythm is forming. Go at your own pace.",
+    "You're looking after yourself well. Keep it kind.",
+    "Steady and consistent — your body thanks you.",
+    "Look how far you've come. Rest when you need to.",
+  ],
+  balanced: [
+    "Today is a great day to begin.",
+    "You've started — keep the momentum.",
+    "Building a rhythm. Stay with it.",
+    "You're in a groove. Beautiful.",
+    "Real consistency. Your body is noticing.",
+    "Extraordinary discipline. You're an inspiration.",
+  ],
+  intense: [
+    "Zero days. Fix that today — no excuses.",
+    "Day one is done. Now prove it wasn't a fluke.",
+    "Don't you dare break the chain now.",
+    "Good. Now raise the bar — comfort is the enemy.",
+    "This is where most people quit. Not you. Keep pushing.",
+    "Elite consistency. Defend this streak like a title.",
+  ],
+};
+
+export function streakMessage(streak: number, style: MotivationStyle = "balanced") {
+  const tier = streak === 0 ? 0 : streak === 1 ? 1 : streak < 4 ? 2 : streak < 8 ? 3 : streak < 21 ? 4 : 5;
+  return STREAK_COPY[style][tier];
+}
+
+/** Body text for the daily check-in reminder notification. */
+export function reminderMessage(style: MotivationStyle = "balanced") {
+  if (style === "gentle") return "No pressure — when you have a moment, note how you slept and how you feel.";
+  if (style === "intense") return "Log your sleep and recovery now. Champions track everything.";
+  return "Take 30 seconds to log how you slept and how you're feeling today.";
+}
+
+/** One line for the AI coach so its tone matches the user's preference. */
+export function coachToneInstruction(style: MotivationStyle = "balanced") {
+  if (style === "gentle") return "Coaching tone: gentle — warm, reassuring and supportive; never guilt-trip.";
+  if (style === "intense") return "Coaching tone: intense — direct, demanding and accountability-focused (but never unsafe).";
+  return "Coaching tone: balanced — encouraging, with clear goals and honest feedback.";
 }

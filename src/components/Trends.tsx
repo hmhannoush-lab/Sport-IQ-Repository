@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useStore } from "@/lib/store";
 import { buildSeries, seriesStats, MetricKey } from "@/lib/stats";
+import { useUnits, seriesInUnits } from "@/lib/units";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart, CartesianGrid } from "recharts";
 import { LineChart as LineIcon, BarChart3 } from "lucide-react";
 
@@ -37,8 +38,10 @@ export const Trends = () => {
   const [active, setActive] = useState<MetricKey>("steps");
   const [days, setDays] = useState(7);
 
-  const def = METRICS.find((m) => m.key === active)!;
-  const series = buildSeries(active, days, store.metrics, store.workouts);
+  const { units, labels } = useUnits();
+  const base = METRICS.find((m) => m.key === active)!;
+  const def = active === "waterMl" ? { ...base, unit: labels.water } : active === "weightKg" ? { ...base, unit: labels.weight } : base;
+  const series = seriesInUnits(active, buildSeries(active, days, store.metrics, store.workouts), units);
   const stats = seriesStats(series);
   const fmt = def.format ?? ((v: number) => (Number.isInteger(v) ? v.toString() : v.toFixed(1)));
 

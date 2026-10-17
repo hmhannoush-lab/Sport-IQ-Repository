@@ -4,6 +4,7 @@ import { Sparkline } from "./Sparkline";
 import { useStore, localDateKey } from "@/lib/store";
 import { buildSeries, seriesStats, MetricKey, SeriesPoint } from "@/lib/stats";
 import { calcBMI, bmiCategory, calcMacros, hydrationTargetMl } from "@/lib/health";
+import { useUnits, kgTo, displayWater } from "@/lib/units";
 import {
   Scale,
   Moon,
@@ -139,6 +140,7 @@ const InsightBlock = ({ icon: Icon, title, subtitle, unit, series, primaryValue,
 
 export const Insights = () => {
   const { store } = useStore();
+  const { units, labels, water, weight } = useUnits();
   const profile = store.profile!;
   const macros = calcMacros(profile);
   const hydroTarget = hydrationTargetMl(profile);
@@ -437,7 +439,7 @@ export const Insights = () => {
         tone: "neutral",
         direction: "flat",
         diet: [
-          `Target ${(hydroTarget / 1000).toFixed(1)}L water and ~${macros.calories.toLocaleString()} kcal/day.`,
+          `Target ${water(hydroTarget)} water and ~${macros.calories.toLocaleString()} kcal/day.`,
           "Front-load water: 500ml on waking cuts afternoon fatigue.",
         ],
         training: [
@@ -451,7 +453,7 @@ export const Insights = () => {
     const wayOver = calAvg > macros.calories * 1.15;
     if (underHydrated) {
       return {
-        headline: `${(waterAvg / 1000).toFixed(1)}L / ${(hydroTarget / 1000).toFixed(1)}L — chronically under-hydrated.`,
+        headline: `${water(waterAvg)} / ${water(hydroTarget)} — chronically under-hydrated.`,
         tone: "alert",
         direction: trendDirection(waStats.trend),
         diet: [
@@ -498,7 +500,7 @@ export const Insights = () => {
       };
     }
     return {
-      headline: `Hydration and fueling on target (${(waterAvg / 1000).toFixed(1)}L · ${Math.round(calAvg).toLocaleString()} kcal).`,
+      headline: `Hydration and fueling on target (${water(waterAvg)} · ${Math.round(calAvg).toLocaleString()} kcal).`,
       tone: "good",
       direction: "flat",
       diet: [
@@ -640,9 +642,9 @@ export const Insights = () => {
         icon={Scale}
         title="Weight & BMI"
         subtitle={`Goal: ${goal} · target ${macros.calories.toLocaleString()} kcal`}
-        unit="kg"
-        primaryValue={currentWeight.toFixed(1)}
-        secondaryValue={`BMI ${bmi.toFixed(1)} · ${bmiCat.label}${profile.targetWeightKg ? ` · target ${profile.targetWeightKg}kg` : ""}`}
+        unit={labels.weight}
+        primaryValue={kgTo(currentWeight, units).toFixed(1)}
+        secondaryValue={`BMI ${bmi.toFixed(1)} · ${bmiCat.label}${profile.targetWeightKg ? ` · target ${weight(profile.targetWeightKg)}` : ""}`}
         series={weightSeries}
         rec={weightRec}
       />
@@ -715,9 +717,9 @@ export const Insights = () => {
         <InsightBlock
           icon={Droplets}
           title="Hydration"
-          subtitle={`Target ${(hydroTarget / 1000).toFixed(1)}L / day`}
-          unit="L avg"
-          primaryValue={waStats.count ? (waterAvg / 1000).toFixed(1) : "—"}
+          subtitle={`Target ${water(hydroTarget)} / day`}
+          unit={`${labels.water} avg`}
+          primaryValue={waStats.count ? String(displayWater(waterAvg, units)) : "—"}
           secondaryValue={waStats.count ? `${Math.round((waterAvg / hydroTarget) * 100)}% of target` : undefined}
           series={waterSeries}
           rec={hydroRec}

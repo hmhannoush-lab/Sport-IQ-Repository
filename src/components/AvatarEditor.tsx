@@ -4,6 +4,7 @@ import { useStore } from "@/lib/store";
 import { AVATAR_OPTIONS } from "@/lib/badges";
 import { Upload, Trash2 } from "lucide-react";
 import { useT } from "@/lib/i18n";
+import { compressImage } from "@/lib/image";
 
 export const AvatarEditor = ({ children }: { children: React.ReactNode }) => {
   const { store, setProfile } = useStore();
@@ -12,16 +13,16 @@ export const AvatarEditor = ({ children }: { children: React.ReactNode }) => {
   const profile = store.profile;
   if (!profile) return <>{children}</>;
 
-  const onPickFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
-    if (file.size > 3 * 1024 * 1024) {
-      alert(t("Please choose an image under 3 MB."));
-      return;
+    try {
+      // Shrunk to a small JPEG so even large phone photos fit in local storage.
+      setProfile({ ...profile, avatarImage: await compressImage(file) });
+    } catch {
+      alert(t("Couldn't read that image. Try a JPG or PNG."));
     }
-    const reader = new FileReader();
-    reader.onload = () => setProfile({ ...profile, avatarImage: String(reader.result) });
-    reader.readAsDataURL(file);
   };
 
   return (

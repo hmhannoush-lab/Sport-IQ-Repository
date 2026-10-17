@@ -11,6 +11,9 @@ import { Sparkles, Send, Loader2, Trash2, BookOpen, ExternalLink, FileText, File
 import { downloadBibliographyCsv, printBibliographyPdf } from "@/lib/bibliography";
 import { NUTRITION_SOURCES, TRAINING_SOURCES, getRecoveryCitations } from "@/lib/evidence";
 import { tournamentContext } from "@/lib/tournament";
+import { coachToneInstruction } from "@/lib/motivation";
+import { formatHeight, formatWeight, unitLabels } from "@/lib/units";
+import { formatSets } from "@/lib/workoutSets";
 import { TournamentPlanner } from "@/components/TournamentPlanner";
 import { toast } from "@/hooks/use-toast";
 
@@ -42,15 +45,18 @@ function buildContext(store: ReturnType<typeof useStore>["store"]) {
     const info = SPORTS.find((s) => s.id === sp.sportId);
     return `- ${info?.name ?? sp.sportId} (${sp.level}, ${sp.sessionsPerWeek}x/wk)${sp.notes ? ` — ${sp.notes}` : ""}`;
   });
+  const units = store.preferences?.units ?? "metric";
   const recentWorkouts = store.workouts.slice(0, 5).map(
-    (w) => `- ${w.date}: ${w.type} ${w.durationMin}min @ ${w.intensity}`,
+    (w) => `- ${w.date}: ${w.type} ${w.durationMin}min @ ${w.intensity}${w.sets?.length ? ` — ${formatSets(w.sets, units)}` : ""}`,
   );
   const allergyList = [
     ...allergenLabels(store.healthBaseline?.allergies ?? []),
     ...(store.healthBaseline?.allergyNotes?.trim() ? [store.healthBaseline.allergyNotes.trim()] : []),
   ];
   return [
-    `Name: ${p.name}, ${p.age}y ${p.sex}, ${p.heightCm}cm/${p.weightKg}kg`,
+    `Name: ${p.name}, ${p.age}y ${p.sex}, ${formatHeight(p.heightCm, units)}/${formatWeight(p.weightKg, units)}`,
+    `Preferred units: ${units} (${Object.values(unitLabels(units)).join(", ")}) — use these in every answer.`,
+    coachToneInstruction(store.preferences?.motivationStyle),
     `Lifestyle: ${p.lifestyle}, Diet: ${p.diet}, Goal: ${p.goal}`,
     allergyList.length
       ? `ALLERGIES / INTOLERANCES (never suggest these foods): ${allergyList.join(", ")}`

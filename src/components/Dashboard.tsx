@@ -1,6 +1,7 @@
 import { useStore, todayKey } from "@/lib/store";
 import { calcBMI, bmiCategory, calcMacros, hydrationTargetMl } from "@/lib/health";
 import { buildSeries, seriesStats } from "@/lib/stats";
+import { useUnits, displayWater, kgTo, mlFrom } from "@/lib/units";
 import { MetricCard } from "./MetricCard";
 import { Motivation } from "./Motivation";
 import { CoachBrief } from "./CoachBrief";
@@ -23,6 +24,11 @@ export const Dashboard = () => {
   const { store, upsertMetrics } = useStore();
   useMetricAlertNotifier();
   const profile = store.profile!;
+  const { units, labels } = useUnits();
+  const imperial = units === "imperial";
+  // Quick-add buttons: a glass and a bottle in the user's units.
+  const glass = imperial ? Math.round(mlFrom(8, units)) : 250;
+  const bottle = imperial ? Math.round(mlFrom(16, units)) : 500;
 
   const today = store.metrics[todayKey()] ?? { date: todayKey(), waterMl: 0, sleepHours: 0, steps: 0, restingHr: 0, mood: 3 };
 
@@ -100,8 +106,8 @@ export const Dashboard = () => {
         <MetricCard
           icon={Droplets}
           label="Hydration"
-          value={`${(today.waterMl / 1000).toFixed(1)}`}
-          unit={`/ ${(hydroTarget / 1000).toFixed(1)} L`}
+          value={`${displayWater(today.waterMl, units)}`}
+          unit={`/ ${displayWater(hydroTarget, units)} ${labels.water}`}
           tone={today.waterMl >= hydroTarget ? "good" : today.waterMl >= hydroTarget * 0.5 ? "warning" : "alert"}
           series={waterSeries}
           trend={waterStats.trend}
@@ -109,9 +115,9 @@ export const Dashboard = () => {
         >
           <Progress value={Math.min(100, (today.waterMl / hydroTarget) * 100)} className="mt-3 h-2" />
           <div className="flex gap-2 mt-3">
-            <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => addWater(250)}>+250</Button>
-            <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => addWater(500)}>+500</Button>
-            <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => addWater(-250)}>−</Button>
+            <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => addWater(glass)}>{imperial ? "+8 oz" : "+250"}</Button>
+            <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => addWater(bottle)}>{imperial ? "+16 oz" : "+500"}</Button>
+            <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => addWater(-glass)}>−</Button>
           </div>
         </MetricCard>
         <MetricCard
@@ -137,8 +143,8 @@ export const Dashboard = () => {
         <MetricCard
           icon={Scale}
           label="Weight"
-          value={currentWeight.toFixed(1)}
-          unit="kg"
+          value={kgTo(currentWeight, units).toFixed(1)}
+          unit={labels.weight}
           hint={`BMI ${bmi.toFixed(1)} · ${cat.label}`}
           tone={cat.tone === "good" ? "good" : cat.tone === "warning" ? "warning" : "alert"}
           series={weightSeries}
@@ -158,7 +164,8 @@ export const Dashboard = () => {
         />
       </div>
 
-      <LogToday />
+      {/* Remount on unit change so typed values aren't saved in the wrong units. */}
+      <LogToday key={units} />
 
       <MetricAlerts />
 

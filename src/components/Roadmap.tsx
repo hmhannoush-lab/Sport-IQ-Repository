@@ -1,4 +1,5 @@
 import { useStore, FatigueEntry, todayKey } from "@/lib/store";
+import { useUnits, displayWater } from "@/lib/units";
 import { SPORTS } from "@/lib/sports";
 import {
   calcCalorieTarget,
@@ -95,6 +96,7 @@ const TAB_EXPLANATIONS: { icon: typeof LayoutDashboard; label: string; text: str
 
 export const Roadmap = ({ onEnter }: { onEnter: () => void }) => {
   const { store } = useStore();
+  const { units, labels } = useUnits();
   const p = store.profile;
   if (!p) return null;
 
@@ -187,7 +189,7 @@ export const Roadmap = ({ onEnter }: { onEnter: () => void }) => {
             </div>
             <div className="rounded-xl bg-muted/40 p-4">
               <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Hydration</p>
-              <p className="font-display text-2xl mt-1">{(water / 1000).toFixed(1)}<span className="text-sm text-muted-foreground"> L</span></p>
+              <p className="font-display text-2xl mt-1">{displayWater(water, units)}<span className="text-sm text-muted-foreground"> {labels.water}</span></p>
             </div>
           </div>
 

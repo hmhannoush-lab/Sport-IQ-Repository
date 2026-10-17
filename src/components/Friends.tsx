@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useStore } from "@/lib/store";
 import type { FriendRelationship } from "@/lib/store";
+import { useUnits, displayWater } from "@/lib/units";
 import { buildSnapshot, encodeShareCode, decodeShareCode, FriendSnapshot } from "@/lib/shareCode";
 import { computeLevel } from "@/lib/level";
 import { Button } from "@/components/ui/button";
@@ -84,6 +85,7 @@ function Stat({ icon: Icon, label, mine, theirs, betterWhen = "up", unit = "" }:
 
 export const Friends = () => {
   const { store, addFriend, removeFriend, updateFriend } = useStore();
+  const { units, labels } = useUnits();
   const profile = store.profile!;
   const [paste, setPaste] = useState("");
   const [query, setQuery] = useState("");
@@ -447,7 +449,7 @@ export const Friends = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Stat icon={Footprints} label="Steps · 7d avg" mine={mySnap.steps} theirs={s.steps} />
                   <Stat icon={Moon} label="Sleep · 7d avg" mine={mySnap.sleepHours} theirs={s.sleepHours} unit="h" />
-                  <Stat icon={Droplets} label="Water · 7d avg" mine={Math.round(mySnap.waterMl / 100) / 10} theirs={Math.round(s.waterMl / 100) / 10} unit="L" />
+                  <Stat icon={Droplets} label="Water · 7d avg" mine={displayWater(mySnap.waterMl, units)} theirs={displayWater(s.waterMl, units)} unit={labels.water} />
                   <Stat icon={Dumbbell} label="Workouts · 7d total" mine={mySnap.workoutMin} theirs={s.workoutMin} unit="min" />
                   <Stat icon={HeartPulse} label="Resting HR" mine={mySnap.restingHr} theirs={s.restingHr} betterWhen="down" unit="bpm" />
                   <Stat icon={Trophy} label="Badges" mine={mySnap.badges} theirs={s.badges} />

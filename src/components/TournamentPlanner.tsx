@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Trophy, Dumbbell, Apple, Moon, X } from "lucide-react";
+import { Trophy, Dumbbell, Apple, Moon, X, CalendarPlus } from "lucide-react";
+import { downloadText, tournamentIcs } from "@/lib/exportFiles";
 
 const PHASE_STYLES: Record<string, string> = {
   far: "bg-muted text-muted-foreground border-border",
@@ -124,20 +125,32 @@ export const TournamentPlanner = ({ onAsk }: { onAsk?: (q: string) => void }) =>
                 ))}
               </div>
 
-              {onAsk && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="rounded-full"
-                  onClick={() =>
-                    onAsk(
-                      `Build me a day-by-day plan for the ${plan.daysOut < 0 ? "recovery period after" : `${plan.daysOut} days before`} ${t!.name}, covering training, fuelling and sleep.`,
-                    )
-                  }
-                >
-                  Ask the coach for a day-by-day plan
-                </Button>
-              )}
+              <div className="flex flex-wrap gap-2">
+                {onAsk && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full"
+                    onClick={() =>
+                      onAsk(
+                        `Build me a day-by-day plan for the ${plan.daysOut < 0 ? "recovery period after" : `${plan.daysOut} days before`} ${t!.name}, covering training, fuelling and sleep.`,
+                      )
+                    }
+                  >
+                    Ask the coach for a day-by-day plan
+                  </Button>
+                )}
+                {plan.daysOut >= 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full"
+                    onClick={() => downloadText(`${t!.name.replace(/[^\w-]+/g, "-")}.ics`, tournamentIcs(t!), "text/calendar")}
+                  >
+                    <CalendarPlus className="h-3.5 w-3.5 mr-1.5" /> Add to calendar
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </div>

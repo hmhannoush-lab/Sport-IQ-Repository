@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { useStore } from "@/lib/store";
 import { buildSeries, seriesStats, MetricKey } from "@/lib/stats";
+import { useUnits, seriesInUnits } from "@/lib/units";
 import { Sparkline } from "./Sparkline";
 import { BarChart3, TrendingUp, TrendingDown, Minus } from "lucide-react";
 
@@ -34,6 +35,12 @@ const fmt = (v: number, decimals = 0) =>
 export const MetricStats = () => {
   const { store } = useStore();
   const [days, setDays] = useState(7);
+  const { units, labels } = useUnits();
+  const rows = ROWS.map((r) =>
+    r.key === "waterMl" ? { ...r, unit: labels.water, decimals: units === "imperial" ? 0 : 1 }
+    : r.key === "weightKg" ? { ...r, unit: labels.weight }
+    : r,
+  );
 
   return (
     <Card className="p-5 sm:p-6 border-border/50 shadow-card rounded-3xl bg-card/80 backdrop-blur-sm">
@@ -75,8 +82,8 @@ export const MetricStats = () => {
             </tr>
           </thead>
           <tbody>
-            {ROWS.map((r) => {
-              const series = buildSeries(r.key, days, store.metrics, store.workouts);
+            {rows.map((r) => {
+              const series = seriesInUnits(r.key, buildSeries(r.key, days, store.metrics, store.workouts), units);
               const s = seriesStats(series);
               const has = s.count > 0;
               const up = s.trend > 1;

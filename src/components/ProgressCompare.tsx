@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useStore, localDateKey, type DailyMetrics, type Workout } from "@/lib/store";
 import { hydrationTargetMl } from "@/lib/health";
+import { useUnits } from "@/lib/units";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -55,6 +56,7 @@ function pctChange(recent: number, prior: number): number {
 
 export const ProgressCompare = () => {
   const { store } = useStore();
+  const { units, labels, water, weight } = useUnits();
   const profile = store.profile;
 
   const comparisons = useMemo<Comparison[]>(() => {
@@ -63,7 +65,7 @@ export const ProgressCompare = () => {
     const w = store.workouts;
     const defs: Omit<Comparison, "recent" | "prior">[] = [
       { id: "sleep", icon: Moon, label: "Sleep", unit: "h", goodWhen: "up", format: (v) => `${v.toFixed(1)}h` },
-      { id: "water", icon: Droplets, label: "Hydration", unit: "L", goodWhen: "up", format: (v) => `${(v / 1000).toFixed(1)}L` },
+      { id: "water", icon: Droplets, label: "Hydration", unit: labels.water, goodWhen: "up", format: water },
       { id: "steps", icon: Footprints, label: "Steps", unit: "", goodWhen: "up", format: (v) => Math.round(v).toLocaleString() },
       { id: "hr", icon: HeartPulse, label: "Resting HR", unit: "bpm", goodWhen: "down", format: (v) => `${Math.round(v)} bpm` },
       { id: "workouts", icon: Dumbbell, label: "Workout min/day", unit: "min", goodWhen: "up", format: (v) => `${Math.round(v)} min` },
@@ -80,7 +82,8 @@ export const ProgressCompare = () => {
       recent: windowAverage(keyMap[d.id], 0, 7, m, w),
       prior: windowAverage(keyMap[d.id], 7, 7, m, w),
     }));
-  }, [store, profile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `water` is rebuilt from `units` each render
+  }, [store, profile, units]);
 
   const goal = useMemo(() => {
     if (!profile) return null;
@@ -160,20 +163,20 @@ export const ProgressCompare = () => {
           </div>
           <Progress value={goal.pct} className="h-2 mb-3" />
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1"><Scale className="h-3 w-3" />Now {goal.current.toFixed(1)} kg</span>
+            <span className="flex items-center gap-1"><Scale className="h-3 w-3" />Now {weight(goal.current)}</span>
             <span>•</span>
-            <span>Start {goal.start.toFixed(1)} kg</span>
+            <span>Start {weight(goal.start)}</span>
             <span>•</span>
-            <span>Target {goal.target.toFixed(1)} kg</span>
+            <span>Target {weight(goal.target)}</span>
           </div>
           <p className="text-sm text-foreground/80 mt-3 leading-relaxed">
             {goal.pct >= 95
               ? "You've hit your target — beautiful work. Time to set a maintenance plan or define what's next."
               : Math.abs(goal.remaining) < 1
-                ? "You're within a kilo of your target. Keep your routine steady and let the trend finish the job."
+                ? `You're within ${units === "imperial" ? "about 2 lb" : "a kilo"} of your target. Keep your routine steady and let the trend finish the job.`
                 : goal.onTrack
-                  ? `${Math.abs(goal.remaining).toFixed(1)} kg to go — your direction is right. Stay with the habits that are working.`
-                  : `${Math.abs(goal.remaining).toFixed(1)} kg to go in the ${profile.goal === "lose" ? "loss" : "gain"} direction. Worth revisiting calories, protein and recovery this week.`}
+                  ? `${weight(Math.abs(goal.remaining))} to go — your direction is right. Stay with the habits that are working.`
+                  : `${weight(Math.abs(goal.remaining))} to go in the ${profile.goal === "lose" ? "loss" : "gain"} direction. Worth revisiting calories, protein and recovery this week.`}
           </p>
         </div>
       )}

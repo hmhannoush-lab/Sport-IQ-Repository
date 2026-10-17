@@ -57,7 +57,7 @@ export const Motivation = () => {
             </p>
           </div>
         </div>
-        <p className="text-sm text-muted-foreground mt-3">{streakMessage(streak)}</p>
+        <p className="text-sm text-muted-foreground mt-3">{streakMessage(streak, store.preferences?.motivationStyle)}</p>
         <div className="mt-auto pt-4">
           <div className="flex items-center justify-between gap-1.5">
             {days.map((d, i) => (
