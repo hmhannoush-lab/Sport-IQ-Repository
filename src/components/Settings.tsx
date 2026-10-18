@@ -1,23 +1,44 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useStore, todayKey } from "@/lib/store";
+import { useStore, todayKey, defaultPreferences, type Preferences } from "@/lib/store";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Settings as SettingsIcon, Check, RotateCcw, Palette, Type, Languages, Moon, DatabaseBackup, Download, Upload, Ruler, FileSpreadsheet, Smartphone } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { defaultPreferences, type Preferences } from "@/lib/store";
-import { downloadText, metricsCsv, workoutsCsv } from "@/lib/exportFiles";
-import { useInstallPrompt } from "@/lib/pwa";
+import { Settings as SettingsIcon, Check, RotateCcw, Palette, Globe, BellOff, DatabaseBackup, Download, Upload, Smartphone } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { getQuietHours, setQuietHours, isQuietNow } from "@/lib/quietHours";
 import { useTheme } from "@/hooks/use-theme";
 import { useFontPrefs } from "@/hooks/use-font-prefs";
-import { useLanguage } from "@/hooks/use-language";
+import { useLanguage, type LanguageCode } from "@/hooks/use-language";
 import { loadFont } from "@/lib/fonts";
 import { useT } from "@/lib/i18n";
+import { downloadText, metricsCsv, workoutsCsv } from "@/lib/exportFiles";
+import { useInstallPrompt } from "@/lib/pwa";
+
+/** Accordion header: icon, title, and a one-line summary of the current values. */
+const SectionHeader = ({ icon: Icon, title, summary }: { icon: LucideIcon; title: string; summary: string }) => (
+  <span className="flex items-center gap-3 text-left min-w-0">
+    <span className="h-8 w-8 rounded-xl bg-muted/60 flex items-center justify-center shrink-0">
+      <Icon className="h-4 w-4 text-muted-foreground" />
+    </span>
+    <span className="min-w-0">
+      <span className="block font-display text-base leading-tight">{title}</span>
+      <span className="block text-xs text-muted-foreground font-normal truncate">{summary}</span>
+    </span>
+  </span>
+);
+
+const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div className="space-y-1.5">
+    <Label className="text-xs text-muted-foreground">{label}</Label>
+    {children}
+  </div>
+);
 
 export const Settings = () => {
   const t = useT();
@@ -55,13 +76,16 @@ export const Settings = () => {
     else toast.error(t("That file isn't a valid Sport IQ backup."));
   };
 
-
   useEffect(() => {
     fonts.forEach(loadFont);
   }, [fonts]);
 
   const headingChoices = fonts.filter((f) => f.category !== "body");
   const bodyChoices = fonts.filter((f) => f.category !== "display");
+  const theme = themes.find((th) => th.id === currentId);
+  const language = languages.find((l) => l.code === code);
+  const unitsLabel = prefsNow.units === "imperial" ? t("Imperial") : t("Metric");
+  const styleLabel = { gentle: t("Gentle"), balanced: t("Balanced"), intense: t("Intense") }[prefsNow.motivationStyle];
 
   return (
     <Sheet>
@@ -81,254 +105,106 @@ export const Settings = () => {
           <SheetTitle className="font-display text-2xl">{t("Settings")}</SheetTitle>
         </SheetHeader>
 
-        <div className="mt-6 space-y-8">
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <Palette className="h-4 w-4 text-muted-foreground" />
-              <h3 className="font-display text-sm uppercase tracking-[0.2em] text-muted-foreground">
-                {t("Theme")}
-              </h3>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {themes.map((th) => {
-                const active = th.id === currentId;
-                const v = th.vars;
-                return (
-                  <button
-                    key={th.id}
-                    onClick={() => setTheme(th.id)}
-                    className={`relative text-left rounded-xl border p-2.5 transition-zen hover:-translate-y-0.5 ${
-                      active ? "border-primary ring-2 ring-primary/40" : "border-border/60 hover:border-primary/40"
-                    }`}
-                    style={{ background: `hsl(${v.background})` }}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-lg leading-none">{th.emoji}</span>
+        <Accordion type="multiple" className="mt-4">
+          {/* Appearance: theme + text */}
+          <AccordionItem value="appearance" className="border-border/50">
+            <AccordionTrigger className="hover:no-underline">
+              <SectionHeader
+                icon={Palette}
+                title={t("Appearance")}
+                summary={`${theme?.name ?? ""} · ${t("text")} ${Math.round(prefs.scale * 100)}%`}
+              />
+            </AccordionTrigger>
+            <AccordionContent className="space-y-4">
+              <div className="grid grid-cols-3 gap-2">
+                {themes.map((th) => {
+                  const active = th.id === currentId;
+                  const v = th.vars;
+                  return (
+                    <button
+                      key={th.id}
+                      onClick={() => setTheme(th.id)}
+                      className={`relative rounded-xl border p-2 text-left transition-zen ${
+                        active ? "border-primary ring-2 ring-primary/40" : "border-border/60 hover:border-primary/40"
+                      }`}
+                      style={{ background: `hsl(${v.background})` }}
+                    >
+                      <div className="flex gap-1 mb-1.5">
+                        <span className="h-3 flex-1 rounded" style={{ background: `hsl(${v.primary})` }} />
+                        <span className="h-3 flex-1 rounded" style={{ background: `hsl(${v.accent})` }} />
+                      </div>
+                      <p className="text-xs truncate" style={{ color: `hsl(${v.foreground})` }}>
+                        {th.emoji} {th.name}
+                      </p>
                       {active && (
-                        <span
-                          className="h-5 w-5 rounded-full flex items-center justify-center"
-                          style={{ background: `hsl(${v.primary})`, color: "white" }}
-                        >
-                          <Check className="h-3 w-3" />
-                        </span>
+                        <Check className="absolute top-1 right-1 h-3 w-3" style={{ color: `hsl(${v.primary})` }} />
                       )}
-                    </div>
-                    <div className="flex gap-1 mb-2">
-                      <span className="h-4 flex-1 rounded-md" style={{ background: `hsl(${v.primary})` }} />
-                      <span className="h-4 flex-1 rounded-md" style={{ background: `hsl(${v.accent})` }} />
-                      <span className="h-4 flex-1 rounded-md" style={{ background: `hsl(${v.highlight})` }} />
-                    </div>
-                    <p className="font-display text-sm" style={{ color: `hsl(${v.foreground})` }}>
-                      {th.name}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* Fonts */}
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Type className="h-4 w-4 text-muted-foreground" />
-                <h3 className="font-display text-sm uppercase tracking-[0.2em] text-muted-foreground">
-                  {t("Typography")}
-                </h3>
-              </div>
-              <Button variant="ghost" size="sm" onClick={reset} className="h-7 px-2 text-xs rounded-full">
-                <RotateCcw className="h-3 w-3 mr-1" /> {t("Reset")}
-              </Button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <Label className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  {t("Headings")}
-                </Label>
-                <div className="mt-2 grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
-                  {headingChoices.map((f) => {
-                    const active = prefs.headingId === f.id;
-                    return (
-                      <button
-                        key={f.id}
-                        onClick={() => setHeading(f.id)}
-                        className={`text-left px-3 py-2 rounded-xl border transition-zen text-sm ${
-                          active
-                            ? "border-primary bg-primary-soft/50 ring-1 ring-primary"
-                            : "border-border/60 hover:border-primary/40 hover:bg-muted/40"
-                        }`}
-                        style={{ fontFamily: f.stack }}
-                      >
-                        {f.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <Label className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                  {t("Body")}
-                </Label>
-                <div className="mt-2 grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
-                  {bodyChoices.map((f) => {
-                    const active = prefs.bodyId === f.id;
-                    return (
-                      <button
-                        key={f.id}
-                        onClick={() => setBody(f.id)}
-                        className={`text-left px-3 py-2 rounded-xl border transition-zen text-sm ${
-                          active
-                            ? "border-primary bg-primary-soft/50 ring-1 ring-primary"
-                            : "border-border/60 hover:border-primary/40 hover:bg-muted/40"
-                        }`}
-                        style={{ fontFamily: f.stack }}
-                      >
-                        {f.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between">
-                  <Label className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                    {t("Size")}
-                  </Label>
-                  <span className="text-xs tabular-nums text-muted-foreground">
-                    {Math.round(prefs.scale * 100)}%
-                  </span>
-                </div>
-                <Slider
-                  className="mt-3"
-                  min={0.85}
-                  max={1.25}
-                  step={0.05}
-                  value={[prefs.scale]}
-                  onValueChange={(v) => setScale(v[0])}
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* Language */}
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <Languages className="h-4 w-4 text-muted-foreground" />
-              <h3 className="font-display text-sm uppercase tracking-[0.2em] text-muted-foreground">
-                {t("Language")}
-              </h3>
-            </div>
-            <div className="grid grid-cols-1 gap-1 max-h-72 overflow-y-auto pr-1">
-              {languages.map((lang) => {
-                const active = code === lang.code;
-                return (
-                  <button
-                    key={lang.code}
-                    onClick={() => setLanguage(lang.code)}
-                    className={`flex items-center justify-between px-3 py-2 rounded-xl border transition-zen text-sm ${
-                      active
-                        ? "border-primary bg-primary-soft/50 ring-1 ring-primary"
-                        : "border-border/60 hover:border-primary/40 hover:bg-muted/40"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2.5">
-                      <span className="text-lg leading-none">{lang.flag}</span>
-                      <span className="flex flex-col items-start leading-tight">
-                        <span className="font-medium">{lang.native}</span>
-                        <span className="text-[11px] text-muted-foreground">{lang.name}</span>
-                      </span>
-                    </span>
-                    {active && <Check className="h-4 w-4 text-primary" />}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* Quiet hours */}
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <Moon className="h-4 w-4 text-muted-foreground" />
-              <h3 className="font-display text-sm uppercase tracking-[0.2em] text-muted-foreground">
-                {t("Quiet hours")}
-              </h3>
-            </div>
-
-            <div className="rounded-xl border border-border/60 p-3 space-y-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <Label className="text-sm">{t("Silence alerts while I sleep")}</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {isQuietNow(new Date(), quiet)
-                      ? t("Quiet hours are active right now.")
-                      : t("No sounds or notifications during this window.")}
-                  </p>
-                </div>
-                <Switch checked={quiet.enabled} onCheckedChange={(v) => updateQuiet({ enabled: v })} />
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                    {t("From")}
-                  </Label>
-                  <Input
-                    type="time"
-                    className="mt-1.5"
-                    value={quiet.start}
-                    disabled={!quiet.enabled}
-                    onChange={(e) => updateQuiet({ start: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-                    {t("Until")}
-                  </Label>
-                  <Input
-                    type="time"
-                    className="mt-1.5"
-                    value={quiet.end}
-                    disabled={!quiet.enabled}
-                    onChange={(e) => updateQuiet({ end: e.target.value })}
-                  />
-                </div>
+                <Field label={t("Heading font")}>
+                  <Select value={prefs.headingId} onValueChange={setHeading}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {headingChoices.map((f) => (
+                        <SelectItem key={f.id} value={f.id} style={{ fontFamily: f.stack }}>{f.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label={t("Body font")}>
+                  <Select value={prefs.bodyId} onValueChange={setBody}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {bodyChoices.map((f) => (
+                        <SelectItem key={f.id} value={f.id} style={{ fontFamily: f.stack }}>{f.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
               </div>
 
-              <div className="space-y-2.5">
+              <div>
                 <div className="flex items-center justify-between">
-                  <Label className="text-sm text-muted-foreground">{t("Mute sounds")}</Label>
-                  <Switch
-                    checked={quiet.muteSound}
-                    disabled={!quiet.enabled}
-                    onCheckedChange={(v) => updateQuiet({ muteSound: v })}
-                  />
+                  <Label className="text-xs text-muted-foreground">{t("Text size")}</Label>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs tabular-nums text-muted-foreground">{Math.round(prefs.scale * 100)}%</span>
+                    <Button variant="ghost" size="sm" onClick={reset} className="h-6 px-2 text-xs rounded-full">
+                      <RotateCcw className="h-3 w-3 mr-1" /> {t("Reset")}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm text-muted-foreground">{t("Mute notifications")}</Label>
-                  <Switch
-                    checked={quiet.muteNotifications}
-                    disabled={!quiet.enabled}
-                    onCheckedChange={(v) => updateQuiet({ muteNotifications: v })}
-                  />
-                </div>
+                <Slider className="mt-2" min={0.85} max={1.25} step={0.05} value={[prefs.scale]} onValueChange={(v) => setScale(v[0])} />
               </div>
-            </div>
-          </section>
+            </AccordionContent>
+          </AccordionItem>
 
-          {/* Units & coaching tone */}
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <Ruler className="h-4 w-4 text-muted-foreground" />
-              <h3 className="font-display text-sm uppercase tracking-[0.2em] text-muted-foreground">
-                {t("Units & coaching")}
-              </h3>
-            </div>
-            <div className="rounded-xl border border-border/60 p-3 space-y-3">
-              <div className="space-y-1.5">
-                <Label className="text-sm">{t("Units")}</Label>
+          {/* Language, units & coaching */}
+          <AccordionItem value="preferences" className="border-border/50">
+            <AccordionTrigger className="hover:no-underline">
+              <SectionHeader
+                icon={Globe}
+                title={t("Language & units")}
+                summary={`${language?.native ?? code} · ${unitsLabel} · ${styleLabel} ${t("coaching")}`}
+              />
+            </AccordionTrigger>
+            <AccordionContent className="space-y-3">
+              <Field label={t("Language")}>
+                <Select value={code} onValueChange={(v) => setLanguage(v as LanguageCode)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {languages.map((lang) => (
+                      <SelectItem key={lang.code} value={lang.code}>
+                        {lang.flag} {lang.native}{lang.native !== lang.name ? ` · ${lang.name}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label={t("Units")}>
                 <Select value={prefsNow.units} onValueChange={(v) => updatePreferences({ units: v as Preferences["units"] })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -336,9 +212,8 @@ export const Settings = () => {
                     <SelectItem value="imperial">{t("Imperial (lb, ft/in, fl oz)")}</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-sm">{t("Motivation style")}</Label>
+              </Field>
+              <Field label={t("Motivation style")}>
                 <Select value={prefsNow.motivationStyle} onValueChange={(v) => updatePreferences({ motivationStyle: v as Preferences["motivationStyle"] })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -347,82 +222,102 @@ export const Settings = () => {
                     <SelectItem value="intense">{t("Intense — push me, hold me accountable")}</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">{t("Changes your streak messages, reminders and the AI coach's tone.")}</p>
-              </div>
-            </div>
-          </section>
+              </Field>
+              <p className="text-xs text-muted-foreground">{t("Motivation style changes your streak messages, reminders and the AI coach's tone.")}</p>
+            </AccordionContent>
+          </AccordionItem>
 
-          {/* Backup & restore */}
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <DatabaseBackup className="h-4 w-4 text-muted-foreground" />
-              <h3 className="font-display text-sm uppercase tracking-[0.2em] text-muted-foreground">
-                {t("Backup & restore")}
-              </h3>
-            </div>
-            <div className="rounded-xl border border-border/60 p-3 space-y-3">
+          {/* Quiet hours */}
+          <AccordionItem value="quiet" className="border-border/50">
+            <AccordionTrigger className="hover:no-underline">
+              <SectionHeader
+                icon={BellOff}
+                title={t("Quiet hours")}
+                summary={quiet.enabled ? `${quiet.start}–${quiet.end}${isQuietNow(new Date(), quiet) ? ` · ${t("active now")}` : ""}` : t("Off")}
+              />
+            </AccordionTrigger>
+            <AccordionContent className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <Label className="text-sm">{t("Silence alerts while I sleep")}</Label>
+                <Switch checked={quiet.enabled} onCheckedChange={(v) => updateQuiet({ enabled: v })} />
+              </div>
+              {quiet.enabled && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label={t("From")}>
+                      <Input type="time" value={quiet.start} onChange={(e) => updateQuiet({ start: e.target.value })} />
+                    </Field>
+                    <Field label={t("Until")}>
+                      <Input type="time" value={quiet.end} onChange={(e) => updateQuiet({ end: e.target.value })} />
+                    </Field>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm text-muted-foreground">{t("Mute sounds")}</Label>
+                    <Switch checked={quiet.muteSound} onCheckedChange={(v) => updateQuiet({ muteSound: v })} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm text-muted-foreground">{t("Mute notifications")}</Label>
+                    <Switch checked={quiet.muteNotifications} onCheckedChange={(v) => updateQuiet({ muteNotifications: v })} />
+                  </div>
+                </>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+
+          {/* Backup, restore & export */}
+          <AccordionItem value="data" className="border-border/50">
+            <AccordionTrigger className="hover:no-underline">
+              <SectionHeader icon={DatabaseBackup} title={t("Your data")} summary={t("Backup, restore & spreadsheet export")} />
+            </AccordionTrigger>
+            <AccordionContent className="space-y-3">
               <p className="text-xs text-muted-foreground">
                 {t("Your data lives only in this browser. Download a backup to keep it safe or move it to another device.")}
               </p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1 rounded-full" onClick={downloadBackup}>
-                  <Download className="h-3.5 w-3.5 mr-1.5" /> {t("Download")}
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" size="sm" className="rounded-full" onClick={downloadBackup}>
+                  <Download className="h-3.5 w-3.5 mr-1.5" /> {t("Backup")}
                 </Button>
-                <Button variant="outline" size="sm" className="flex-1 rounded-full" onClick={() => fileRef.current?.click()}>
+                <Button variant="outline" size="sm" className="rounded-full" onClick={() => fileRef.current?.click()}>
                   <Upload className="h-3.5 w-3.5 mr-1.5" /> {t("Restore")}
                 </Button>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="application/json,.json"
-                  className="hidden"
-                  onChange={(e) => restoreBackup(e.target.files?.[0])}
-                />
+                <Button variant="ghost" size="sm" className="rounded-full text-muted-foreground" onClick={() => downloadCsv("metrics")}>
+                  {t("Metrics CSV")}
+                </Button>
+                <Button variant="ghost" size="sm" className="rounded-full text-muted-foreground" onClick={() => downloadCsv("workouts")}>
+                  {t("Workouts CSV")}
+                </Button>
               </div>
-              <div className="pt-3 border-t border-border/40 space-y-2">
-                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <FileSpreadsheet className="h-3.5 w-3.5" /> {t("Spreadsheet export (CSV, metric units)")}
-                </p>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1 rounded-full" onClick={() => downloadCsv("metrics")}>
-                    {t("Daily metrics")}
-                  </Button>
-                  <Button variant="outline" size="sm" className="flex-1 rounded-full" onClick={() => downloadCsv("workouts")}>
-                    {t("Workouts")}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </section>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={(e) => restoreBackup(e.target.files?.[0])}
+              />
+            </AccordionContent>
+          </AccordionItem>
 
-          {/* Install as an app */}
-          <section>
-            <div className="flex items-center gap-2 mb-3">
-              <Smartphone className="h-4 w-4 text-muted-foreground" />
-              <h3 className="font-display text-sm uppercase tracking-[0.2em] text-muted-foreground">
-                {t("Install app")}
-              </h3>
-            </div>
-            <div className="rounded-xl border border-border/60 p-3 space-y-3">
-              {installed ? (
-                <p className="text-xs text-muted-foreground">{t("Sport IQ is installed on this device.")}</p>
-              ) : (
-                <>
-                  <p className="text-xs text-muted-foreground">
-                    {canInstall
-                      ? t("Add Sport IQ to your home screen. It opens like an app and works offline.")
-                      : t("To install, open your browser menu and choose \"Add to Home Screen\" or \"Install app\". On iPhone, use Safari's Share button.")}
-                  </p>
-                  {canInstall && (
-                    <Button variant="outline" size="sm" className="w-full rounded-full" onClick={install}>
-                      <Download className="h-3.5 w-3.5 mr-1.5" /> {t("Install Sport IQ")}
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
-          </section>
-        </div>
+          {/* Install as an app — hidden once installed */}
+          {!installed && (
+            <AccordionItem value="install" className="border-border/50">
+              <AccordionTrigger className="hover:no-underline">
+                <SectionHeader icon={Smartphone} title={t("Install app")} summary={t("Home screen & offline use")} />
+              </AccordionTrigger>
+              <AccordionContent className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  {canInstall
+                    ? t("Add Sport IQ to your home screen. It opens like an app and works offline.")
+                    : t("To install, open your browser menu and choose \"Add to Home Screen\" or \"Install app\". On iPhone, use Safari's Share button.")}
+                </p>
+                {canInstall && (
+                  <Button variant="outline" size="sm" className="w-full rounded-full" onClick={install}>
+                    <Download className="h-3.5 w-3.5 mr-1.5" /> {t("Install Sport IQ")}
+                  </Button>
+                )}
+              </AccordionContent>
+            </AccordionItem>
+          )}
+        </Accordion>
       </SheetContent>
     </Sheet>
   );
