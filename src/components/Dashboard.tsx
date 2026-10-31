@@ -16,6 +16,7 @@ import { useMetricAlertNotifier } from "@/hooks/use-metric-alert-notifier";
 
 
 import { PersonalAdvice } from "./PersonalAdvice";
+import { InjuryPrevention } from "./InjuryPrevention";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Droplets, Moon, Footprints, HeartPulse, Scale, Flame, Dumbbell } from "lucide-react";
@@ -64,7 +65,7 @@ export const Dashboard = () => {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground mb-1">Today · {new Date().toLocaleDateString(undefined, { weekday: "long" })}</p>
-          <h2 className="font-display text-4xl sm:text-5xl text-foreground leading-[1.05] tracking-tight">
+          <h2 className="font-display text-4xl sm:text-5xl text-foreground leading-relaxed tracking-tight overflow-visible">
             How you're <span className="text-gradient-sage italic">doing</span>
           </h2>
         </div>
@@ -78,6 +79,8 @@ export const Dashboard = () => {
       <ProgressCompare />
 
       <PersonalAdvice compact />
+
+      <InjuryPrevention />
 
       <Badges />
 

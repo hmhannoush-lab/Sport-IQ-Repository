@@ -9,10 +9,11 @@ import { Sports } from "@/components/Sports";
 import { CoachBrief } from "@/components/CoachBrief";
 import { Friends } from "@/components/Friends";
 import { EvidenceSources } from "@/components/EvidenceSources";
+import { InjuryPreventionDetail } from "@/components/InjuryPreventionDetail";
 import { Insights } from "@/components/Insights";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Leaf, LayoutDashboard, Salad, HeartPulse, Dumbbell, RotateCcw, BookOpen, Volleyball, Sparkles, Users, Menu, Check, LineChart } from "lucide-react";
+import { Leaf, LayoutDashboard, Salad, HeartPulse, Dumbbell, RotateCcw, BookOpen, Volleyball, Sparkles, Users, Menu, Check, LineChart, Shield } from "lucide-react";
 import { VitalLogo } from "@/components/VitalLogo";
 import { Roadmap } from "@/components/Roadmap";
 import { Settings } from "@/components/Settings";
@@ -21,7 +22,7 @@ import { AvatarEditor } from "@/components/AvatarEditor";
 import { useT } from "@/lib/i18n";
 import { useMorningReminder } from "@/hooks/use-morning-reminder";
 
-type Tab = "dashboard" | "insights" | "coach" | "diet" | "fatigue" | "workouts" | "sports" | "friends" | "sources";
+type Tab = "dashboard" | "insights" | "coach" | "diet" | "fatigue" | "workouts" | "sports" | "prevention" | "friends" | "sources";
 
 const TABS: { id: Tab; label: string; icon: typeof Leaf }[] = [
   { id: "dashboard", label: "Today", icon: LayoutDashboard },
@@ -31,6 +32,7 @@ const TABS: { id: Tab; label: string; icon: typeof Leaf }[] = [
   { id: "fatigue", label: "Recovery", icon: HeartPulse },
   { id: "workouts", label: "Workouts", icon: Dumbbell },
   { id: "sports", label: "Sports", icon: Volleyball },
+  { id: "prevention", label: "Prevention", icon: Shield },
   { id: "friends", label: "Friends", icon: Users },
   { id: "sources", label: "Sources", icon: BookOpen },
 ];
@@ -169,6 +171,7 @@ const Index = () => {
         {tab === "fatigue" && <Fatigue />}
         {tab === "workouts" && <Workouts />}
         {tab === "sports" && <Sports />}
+        {tab === "prevention" && <InjuryPreventionDetail />}
         {tab === "friends" && <Friends />}
         {tab === "sources" && <EvidenceSources />}
       </main>

@@ -1,4 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#ef5ba6"/>
-  <polyline points="88,272 184,272 224,176 288,352 328,240 424,240" fill="none" stroke="#ffffff" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Light teal rounded square background -->
+  <rect width="200" height="200" rx="36" fill="#c0e8e5"/>
+
+  <!-- Heart shape outline -->
+  <path d="M100 170 C55 140, 30 110, 30 80 C30 55, 48 40, 68 40 C83 40, 96 50, 100 65 C104 50, 117 40, 132 40 C152 40, 170 55, 170 80 C170 110, 145 140, 100 170 Z"
+        fill="none" stroke="#2a9d7f" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Heartbeat/pulse line inside -->
+  <polyline points="48,100 62,100 66,94 70,108 74,94 78,100 82,100 95,100 98,96 101,108 104,96 107,100 118,100 135,100"
+            fill="none" stroke="#2a9d7f" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
